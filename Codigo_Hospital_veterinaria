@@ -1,0 +1,251 @@
+from abc import ABC, abstractmethod
+
+
+
+#  CLASE ABSTRACTA: Persona
+class Persona(ABC):
+    def __init__(self, nombre: str, documento: str):
+        self.nombre = nombre
+        self.documento = documento
+
+    @abstractmethod
+    def mostrar_rol(self) -> str:
+        pass
+
+    def __str__(self):
+        return f"{self.nombre} (Doc: {self.documento})"
+
+
+#  HERENCIA: Veterinario, Recepcionista, Cliente
+class Veterinario(Persona):
+    def __init__(self, nombre: str, documento: str, especialidad: str):
+        super().__init__(nombre, documento)
+        self.especialidad = especialidad
+
+    def mostrar_rol(self) -> str:
+        return f"[VETERINARIO] {self.nombre} — Especialidad: {self.especialidad}"
+
+    def atender_mascota(self, mascota) -> str:
+        return f"Dr(a). {self.nombre} está atendiendo a {mascota.nombre}."
+
+
+class Recepcionista(Persona):
+    def mostrar_rol(self) -> str:
+        return f"[RECEPCIONISTA] {self.nombre}"
+
+    def registrar_cliente(self, cliente) -> str:
+        return f"Recepcionista {self.nombre} registró al cliente: {cliente.nombre}."
+
+
+class Cliente(Persona):
+    def __init__(self, nombre: str, documento: str, telefono: str):
+        super().__init__(nombre, documento)
+        self.telefono = telefono
+        self.mascotas = []         # AGREGACIÓN: lista de mascotas
+
+    def mostrar_rol(self) -> str:
+        return f"[CLIENTE] {self.nombre} — Tel: {self.telefono}"
+
+    def agregar_mascota(self, mascota):
+        self.mascotas.append(mascota)
+        print(f"  Mascota '{mascota.nombre}' agregada al cliente {self.nombre}.")
+
+    def mostrar_mascotas(self):
+        if not self.mascotas:
+            print(f"  {self.nombre} no tiene mascotas registradas.")
+        else:
+            print(f"  Mascotas de {self.nombre}:")
+            for m in self.mascotas:
+                m.mostrar_info()
+
+
+#  Mascota  (parte de la AGREGACIÓN con Cliente)
+
+class Mascota:
+    def __init__(self, nombre: str, especie: str, edad: int, peso: float):
+        self.nombre = nombre
+        self.especie = especie
+        self.edad = edad
+        self.peso = peso
+
+    def mostrar_info(self):
+        print(f"     {self.nombre} | {self.especie} | {self.edad} años | {self.peso} kg")
+
+
+
+#  Tratamiento  (parte de la COMPOSICIÓN con Consulta)
+
+class Tratamiento:
+    def __init__(self, nombre: str, costo: float, duracion_dias: int):
+        self.nombre = nombre
+        self.costo = costo
+        self.duracion_dias = duracion_dias
+
+    def mostrar_tratamiento(self):
+        print(f"    • Tratamiento: {self.nombre} | ${self.costo:.2f} | {self.duracion_dias} días")
+
+
+
+#  Consulta  (ASOCIACIÓN con Veterinario y Mascota,
+#             COMPOSICIÓN con Tratamiento)
+
+class Consulta:
+    def __init__(self, mascota: Mascota, veterinario: Veterinario,
+                 motivo: str, diagnostico: str):
+        self.mascota = mascota           # ASOCIACIÓN
+        self.veterinario = veterinario   # ASOCIACIÓN
+        self.motivo = motivo
+        self.diagnostico = diagnostico
+        self.tratamientos = []           # COMPOSICIÓN (nacen dentro de la consulta)
+
+    def crear_tratamiento(self, nombre: str, costo: float, duracion_dias: int):
+        """Los tratamientos se crean y pertenecen a esta consulta (composición)."""
+        t = Tratamiento(nombre, costo, duracion_dias)
+        self.tratamientos.append(t)
+        print(f"  Tratamiento '{nombre}' creado en la consulta.")
+        return t
+
+    def calcular_costo_consulta(self) -> float:
+        return sum(t.costo for t in self.tratamientos)
+
+    def mostrar_resumen(self):
+        print(f"\n  ── Resumen de Consulta ──")
+        print(f"  Mascota    : {self.mascota.nombre} ({self.mascota.especie})")
+        print(f"  Veterinario: {self.veterinario.nombre}")
+        print(f"  Motivo     : {self.motivo}")
+        print(f"  Diagnóstico: {self.diagnostico}")
+        print(f"  Tratamientos:")
+        for t in self.tratamientos:
+            t.mostrar_tratamiento()
+        print(f"  Costo total: ${self.calcular_costo_consulta():.2f}")
+
+
+
+#  CLASE ABSTRACTA: MetodoPago  (POLIMORFISMO)
+
+class MetodoPago(ABC):
+    @abstractmethod
+    def procesar_pago(self, monto: float) -> str:
+        pass
+
+
+class PagoEfectivo(MetodoPago):
+    def procesar_pago(self, monto: float) -> str:
+        return f"   Pago en EFECTIVO de ${monto:.2f} procesado exitosamente."
+
+
+class PagoTarjeta(MetodoPago):
+    def __init__(self, numero_tarjeta: str):
+        self.numero_tarjeta = numero_tarjeta
+
+    def procesar_pago(self, monto: float) -> str:
+        ultimos = self.numero_tarjeta[-4:]
+        return f"   Pago con TARJETA (****{ultimos}) de ${monto:.2f} procesado exitosamente."
+
+
+class PagoTransferencia(MetodoPago):
+    def __init__(self, cuenta_destino: str):
+        self.cuenta_destino = cuenta_destino
+
+    def procesar_pago(self, monto: float) -> str:
+        return f"   TRANSFERENCIA a cuenta {self.cuenta_destino} de ${monto:.2f} procesada exitosamente."
+
+
+#  Factura  (usa POLIMORFISMO con MetodoPago)
+
+class Factura:
+    TASA_IMPUESTO = 0.19  # 19% IVA
+
+    def __init__(self, consulta: Consulta):
+        self.consulta = consulta
+        self.subtotal = consulta.calcular_costo_consulta()
+        self.impuesto = 0.0
+        self.total = 0.0
+
+    def calcular_total(self) -> float:
+        self.impuesto = self.subtotal * self.TASA_IMPUESTO
+        self.total = self.subtotal + self.impuesto
+        return self.total
+
+    def pagar(self, metodo_pago: MetodoPago):
+        """Polimorfismo: acepta cualquier subclase de MetodoPago."""
+        self.calcular_total()
+        print(f"\n  ── Factura ──")
+        print(f"  Subtotal : ${self.subtotal:.2f}")
+        print(f"  IVA (19%): ${self.impuesto:.2f}")
+        print(f"  TOTAL    : ${self.total:.2f}")
+        print(metodo_pago.procesar_pago(self.total))
+
+
+#  PRUEBA DEL SISTEMA
+
+def separador(titulo: str):
+    print(f"\n{'═'*50}")
+    print(f"  {titulo}")
+    print(f"{'═'*50}")
+
+
+if __name__ == "__main__":
+
+    separador("1. CREAR CLIENTE Y REGISTRAR MASCOTAS")
+
+    recepcionista = Recepcionista("Laura Gómez", "1012345678")
+    print(recepcionista.mostrar_rol())
+
+    cliente = Cliente("Carlos Pérez", "1098765432", "310-555-0001")
+    print(recepcionista.registrar_cliente(cliente))
+    print(cliente.mostrar_rol())
+
+    mascota1 = Mascota("Max", "Perro", 3, 12.5)
+    mascota2 = Mascota("Luna", "Gato", 2, 4.2)
+
+    cliente.agregar_mascota(mascota1)
+    cliente.agregar_mascota(mascota2)
+    cliente.mostrar_mascotas()
+
+    separador("2. CREAR VETERINARIO Y ATENDER MASCOTA")
+
+    vet = Veterinario("Andrea Torres", "1045678901", "Cirugía y Medicina Interna")
+    print(vet.mostrar_rol())
+    print(vet.atender_mascota(mascota1))
+
+    separador("3. CREAR CONSULTA Y GENERAR TRATAMIENTOS")
+
+    consulta = Consulta(
+        mascota=mascota1,
+        veterinario=vet,
+        motivo="Fiebre y pérdida de apetito",
+        diagnostico="Gastroenteritis leve"
+    )
+
+    consulta.crear_tratamiento("Antibiótico oral 7 días", costo=45000, duracion_dias=7)
+    consulta.crear_tratamiento("Suero de rehidratación", costo=28000, duracion_dias=3)
+
+    consulta.mostrar_resumen()
+
+    separador("4. GENERAR FACTURA Y PAGAR CON EFECTIVO")
+
+    factura = Factura(consulta)
+    pago1 = PagoEfectivo()
+    factura.pagar(pago1)
+
+    separador("5. CAMBIAR MÉTODO DE PAGO — TARJETA")
+
+    factura2 = Factura(consulta)
+    pago2 = PagoTarjeta("4111111111111234")
+    factura2.pagar(pago2)
+
+    separador("6. CAMBIAR MÉTODO DE PAGO — TRANSFERENCIA")
+
+    factura3 = Factura(consulta)
+    pago3 = PagoTransferencia("COL-001-9988776655")
+    factura3.pagar(pago3)
+
+    separador("RESUMEN DE CONCEPTOS POO APLICADOS")
+    print("   Clase abstracta   : Persona, MetodoPago")
+    print("   Herencia          : Veterinario, Recepcionista, Cliente ← Persona")
+    print("                        PagoEfectivo, PagoTarjeta, PagoTransferencia ← MetodoPago")
+    print("   Agregación        : Cliente <>── Mascota")
+    print("   Composición       : Consulta ◆── Tratamiento")
+    print("   Asociación        : Consulta ── Veterinario, Consulta ── Mascota")
+    print("   Polimorfismo      : Factura.pagar(MetodoPago) → 3 implementaciones")
